@@ -84,7 +84,6 @@ int write_to_log(int fmt, char *msg, ...) {
 
 void del_if_ex(char *folder) {
     char* cmd = concat(BUSYBOX, " rm ", "-rf ", folder);
-    //printf("%s", cmd);
     DIR* dir = opendir(RECOVERY_SYSTEM);
     if (dir) {
         closedir(dir);
@@ -95,12 +94,10 @@ void del_if_ex(char *folder) {
 void copy(char *orig, char *dest, int bbx) {
     if (bbx == 1) {
       char* cmd = concat("/twrp_tmp/busybox cp -r ", orig, " ", dest);
-      //printf("CMD IS: %s\n", cmd);
       system(cmd);
     }
     else if (bbx == 0) {
       char* cmd = concat("/system/bin/cp -r ", orig, " ", dest);
-      //printf("CMD IS: %s\n", cmd);
       system(cmd);
     }
 }
@@ -129,11 +126,12 @@ int main(int argc, char *argv[])
 
           selinux(0);
 
-          printf("lol\n");
+          printf("Starting the TWRP Launcher...\n");
 
           write_to_log(1, "Starting the TWRP Launcher...");
           mountrw();
 
+          printf("Checking files...\n");
           write_to_log(1, "Checking files...");
 
           DIR* dir = opendir(RECOVERY_SYSTEM);
@@ -141,53 +139,67 @@ int main(int argc, char *argv[])
              /* Directory exists. */
              closedir(dir);
           } else if (ENOENT == errno) {
+             printf("ERR: Cannot locate recovery folder in /system");
              write_to_log(3, "Cannot locate recovery folder in /system");
              exit(1);
           }
 
+          printf("Preparing ramdisk...\n");
           write_to_log(3, "Preparing ramdisk...");
 
+          printf("Preparing busybox...\n");
           write_to_log(2, "Preparing busybox...");
           del_if_ex("/twrp_tmp");
           mkdir("/twrp_tmp", 0755);
           copy("/system/recovery/busybox", "/twrp_tmp/", 0);
           system("chmod -R 775 /twrp_tmp/busybox");
 
+          printf("Copying sbin folder...\n");
           write_to_log(2, "Copying sbin folder...");
           del_if_ex("/sbin");
           mkdir("/sbin", 0755);
           copy("/system/recovery/sbin/*", "/sbin/", 0);
           system("/twrp_tmp/busybox chmod -R 755 /sbin/*");
 
+          printf("Copying etc folder...\n");
           write_to_log(2, "Copying etc folder...");
           del_if_ex("/etc");
           mkdir("/etc", 0755);
           copy("/system/recovery/etc/*", "/etc/", 1);
-
+      
+          printf("Copying license folder...\n");
           write_to_log(2, "Copying license folder...");
           del_if_ex("/license");
           mkdir("/license", 0755);
-          copy("/system/recovery/license/*", "/license/", 1);
+          copy("/system/recovery/license/*", "/license/", 1)
 
+          printf("Copying res folder...\n");
           write_to_log(2, "Copying res folder...");
           del_if_ex("/res");
           mkdir("/res", 0755);
           copy("/system/recovery/res/*", "/res/", 1);
 
+
+          printf("Copying twres folder...\n");
           write_to_log(2, "Copying twres folder...");
           del_if_ex("/twres");
           mkdir("/twres", 0755);
           copy("/system/recovery/twres/*", "/twres/", 1);
 
+          printf("Copying root files...\n");
           write_to_log(2, "Copying root files...");
           copy("/system/recovery/rootdir/*", "/", 1);
+      
+          printf("Copying shared libraries...\n");
+          copy("/system/lib64/libdirect-coredump.so", "/sbin/", 1);
 
+          printf("Stopping main services...\n");
           write_to_log(2, "Stoping main services...");
           printf("Stoping main services...\n");
           system("/twrp_tmp/busybox killall -9 system_server");
           //busybox("killall", "-9", "zygote");
           system("/twrp_tmp/busybox killall -9 vold");
-
+      
           write_to_log(2, "Starting TWRP...");
           printf("Starting TWRP...\n");
           execl("/sbin/recovery", "", NULL);
